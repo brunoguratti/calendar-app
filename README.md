@@ -301,9 +301,21 @@ Two appointments conflict if:
 - Rate limiting (100 requests per 15 minutes)
 - CORS enabled
 
+## Email Notifications
+
+The system now includes **automated email notifications** powered by nodemailer:
+
+- **Customer Confirmation**: Customers receive a beautifully formatted email when they book an appointment
+- **Professional Notification**: Professionals receive email alerts for new appointment requests
+- **Styled HTML Emails**: Professional-looking emails with your brand colors
+- **Appointment Details**: All booking information included in the email
+
+Email notifications are sent automatically when:
+- A new appointment is created (customer receives confirmation)
+- Professional receives notification of new booking request
+
 ## Future Enhancements
 
-- Email notifications (Resend integration)
 - Payment processing (Stripe integration)
 - SMS reminders
 - Multi-location support
@@ -311,6 +323,7 @@ Two appointments conflict if:
 - Customer accounts
 - Analytics dashboard
 - Mobile app
+- Appointment status update emails (confirmed/cancelled notifications)
 
 ## Testing
 
@@ -352,6 +365,11 @@ If you ran the seed command, you can:
 - `JWT_SECRET` - Secret key for JWT tokens
 - `PORT` - Server port (default: 3000)
 - `NODE_ENV` - Environment (development/production)
+- `EMAIL_HOST` - Email server hostname (e.g., mail.mensuraanalytics.com)
+- `EMAIL_PORT` - Email server port (default: 465 for SSL)
+- `EMAIL_USER` - Email account username
+- `EMAIL_PASSWORD` - Email account password
+- `EMAIL_FROM` - From address for emails (e.g., "EasySchedule <calendar@mensuraanalytics.com>")
 
 ### Frontend
 - `VITE_API_URL` - Backend API URL

@@ -8,6 +8,10 @@ import {
   getDayOfWeek,
   isPastDateTime
 } from '../utils/slots';
+import {
+  sendAppointmentConfirmationEmail,
+  sendAppointmentNotificationToProfessional
+} from '../utils/email';
 
 export const getPublicProfile = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -276,8 +280,17 @@ export const createPublicAppointment = async (req: Request, res: Response): Prom
       }
     });
 
-    // TODO: Send confirmation email here
-    console.log('TODO: Send confirmation email to', validatedData.customerEmail);
+    // Send confirmation emails
+    try {
+      // Send confirmation email to customer
+      await sendAppointmentConfirmationEmail({ appointment });
+
+      // Send notification email to professional
+      await sendAppointmentNotificationToProfessional({ appointment });
+    } catch (emailError) {
+      // Log email error but don't fail the appointment creation
+      console.error('Email sending failed:', emailError);
+    }
 
     res.status(201).json(appointment);
   } catch (error) {
