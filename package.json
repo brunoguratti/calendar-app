@@ -1,0 +1,25 @@
+{
+  "name": "easy-schedule",
+  "version": "1.0.0",
+  "description": "Online Scheduling System for Micro-Businesses",
+  "private": true,
+  "scripts": {
+    "install:all": "cd backend && npm install && cd ../frontend && npm install",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "build:backend": "cd backend && npm run build",
+    "build:frontend": "cd frontend && npm run build",
+    "prisma:generate": "cd backend && npm run prisma:generate",
+    "prisma:migrate": "cd backend && npm run prisma:migrate",
+    "prisma:seed": "cd backend && npm run prisma:seed",
+    "prisma:studio": "cd backend && npm run prisma:studio"
+  },
+  "keywords": [
+    "scheduling",
+    "appointments",
+    "booking",
+    "calendar"
+  ],
+  "author": "",
+  "license": "MIT"
+}
