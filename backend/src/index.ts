@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import rateLimit from 'express-rate-limit';
+import path from 'path';
 
 // Load environment variables
 dotenv.config();
@@ -12,6 +13,8 @@ import serviceRoutes from './routes/serviceRoutes';
 import availabilityRoutes from './routes/availabilityRoutes';
 import appointmentRoutes from './routes/appointmentRoutes';
 import publicRoutes from './routes/publicRoutes';
+import professionalRoutes from './routes/professionalRoutes';
+import roomRoutes from './routes/roomRoutes';
 
 // Import middleware
 import { errorHandler } from './middleware/errorHandler';
@@ -31,6 +34,10 @@ app.use(cors());
 app.use(express.json());
 app.use(limiter);
 
+// Serve static files for uploads
+const uploadDir = process.env.UPLOAD_DIR || 'uploads';
+app.use('/uploads', express.static(path.join(process.cwd(), uploadDir)));
+
 // Logging middleware
 app.use((req, res, next) => {
   console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
@@ -44,6 +51,8 @@ app.get('/health', (req, res) => {
 
 // API Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/professionals', professionalRoutes);
+app.use('/api/rooms', roomRoutes);
 app.use('/api/services', serviceRoutes);
 app.use('/api/availability', availabilityRoutes);
 app.use('/api/appointments', appointmentRoutes);
