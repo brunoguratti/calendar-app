@@ -5,11 +5,17 @@ import prisma from '../utils/prisma';
 
 export const getAppointments = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const { status, startDate, endDate } = req.query;
+    const { status, startDate, endDate, professionalId } = req.query;
 
     const where: any = {
-      userId: req.userId
+      professional: {
+        userId: req.userId
+      }
     };
+
+    if (professionalId) {
+      where.professionalId = professionalId;
+    }
 
     if (status) {
       where.status = status;
@@ -28,7 +34,25 @@ export const getAppointments = async (req: AuthRequest, res: Response): Promise<
     const appointments = await prisma.appointment.findMany({
       where,
       include: {
-        service: true
+        service: {
+          select: {
+            name: true,
+            price: true,
+            durationMinutes: true,
+          }
+        },
+        professional: {
+          select: {
+            id: true,
+            name: true,
+            avatarUrl: true,
+          }
+        },
+        room: {
+          select: {
+            name: true,
+          }
+        }
       },
       orderBy: [
         { date: 'asc' },
@@ -47,11 +71,13 @@ export const updateAppointmentStatus = async (req: AuthRequest, res: Response): 
     const { id } = req.params;
     const validatedData = updateAppointmentStatusSchema.parse(req.body);
 
-    // Check if appointment exists and belongs to user
+    // Check if appointment exists and belongs to user's professional
     const existing = await prisma.appointment.findFirst({
       where: {
         id,
-        userId: req.userId
+        professional: {
+          userId: req.userId
+        }
       }
     });
 
@@ -63,7 +89,19 @@ export const updateAppointmentStatus = async (req: AuthRequest, res: Response): 
     const appointment = await prisma.appointment.update({
       where: { id },
       data: { status: validatedData.status },
-      include: { service: true }
+      include: {
+        service: {
+          select: {
+            name: true,
+            price: true,
+          }
+        },
+        professional: {
+          select: {
+            name: true,
+          }
+        }
+      }
     });
 
     res.status(200).json(appointment);
@@ -87,10 +125,17 @@ export const getAppointmentStats = async (req: AuthRequest, res: Response): Prom
     const endOfWeek = new Date(startOfWeek);
     endOfWeek.setDate(startOfWeek.getDate() + 7);
 
+    // Base where clause for user's professionals
+    const baseWhere = {
+      professional: {
+        userId: req.userId
+      }
+    };
+
     // Count appointments today
     const appointmentsToday = await prisma.appointment.count({
       where: {
-        userId: req.userId,
+        ...baseWhere,
         date: {
           gte: today,
           lt: tomorrow
@@ -104,7 +149,7 @@ export const getAppointmentStats = async (req: AuthRequest, res: Response): Prom
     // Count appointments this week
     const appointmentsThisWeek = await prisma.appointment.count({
       where: {
-        userId: req.userId,
+        ...baseWhere,
         date: {
           gte: startOfWeek,
           lt: endOfWeek
@@ -118,7 +163,7 @@ export const getAppointmentStats = async (req: AuthRequest, res: Response): Prom
     // Count pending appointments
     const pendingAppointments = await prisma.appointment.count({
       where: {
-        userId: req.userId,
+        ...baseWhere,
         status: 'pending',
         date: {
           gte: today
@@ -129,7 +174,7 @@ export const getAppointmentStats = async (req: AuthRequest, res: Response): Prom
     // Get upcoming appointments (next 5)
     const upcomingAppointments = await prisma.appointment.findMany({
       where: {
-        userId: req.userId,
+        ...baseWhere,
         date: {
           gte: today
         },
@@ -138,7 +183,19 @@ export const getAppointmentStats = async (req: AuthRequest, res: Response): Prom
         }
       },
       include: {
-        service: true
+        service: {
+          select: {
+            name: true,
+            price: true,
+          }
+        },
+        professional: {
+          select: {
+            id: true,
+            name: true,
+            avatarUrl: true,
+          }
+        }
       },
       orderBy: [
         { date: 'asc' },
