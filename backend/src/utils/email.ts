@@ -2,7 +2,7 @@ import nodemailer from 'nodemailer';
 import type { Appointment, Service, User } from '@prisma/client';
 
 // Create transporter
-const transporter = nodemailer.createTransporter({
+const transporter = nodemailer.createTransport({
   host: process.env.EMAIL_HOST,
   port: Number(process.env.EMAIL_PORT) || 465,
   secure: true, // use SSL
@@ -13,7 +13,7 @@ const transporter = nodemailer.createTransporter({
 });
 
 // Verify transporter configuration
-transporter.verify((error, success) => {
+transporter.verify((error) => {
   if (error) {
     console.error('❌ Email transporter verification failed:', error);
   } else {
