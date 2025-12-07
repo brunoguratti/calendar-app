@@ -10,59 +10,200 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// Business owner / Admin account
 model User {
-  id            String         @id @default(cuid())
-  email         String         @unique
-  password      String
-  name          String
-  businessName  String
-  slug          String         @unique
-  createdAt     DateTime       @default(now())
-  services      Service[]
-  appointments  Appointment[]
-  availability  Availability[]
+  id                   String         @id @default(cuid())
+  email                String         @unique
+  password             String
+  name                 String
+  businessName         String
+  slug                 String         @unique
+
+  // Stripe integration
+  stripeCustomerId     String?        @unique
+  subscriptionStatus   String         @default("inactive") // inactive, active, cancelled
+  subscriptionId       String?
+
+  // Settings
+  autoApproveBookings  Boolean        @default(false)
+  cancellationHours    Int            @default(24) // How many hours before appointment client can cancel
+
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+
+  // Relations
+  professionals        Professional[]
+  rooms                Room[]
+  payments             Payment[]
 }
 
-model Service {
-  id              String        @id @default(cuid())
+// Service providers (hairdressers, trainers, etc)
+model Professional {
+  id              String         @id @default(cuid())
   userId          String
-  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   name            String
-  durationMinutes Int
-  price           Float
-  active          Boolean       @default(true)
-  createdAt       DateTime      @default(now())
+  email           String?
+  phone           String?
+  avatarUrl       String?        // Profile photo URL
+  bio             String?
+  specialties     String?        // Comma-separated or JSON
+  active          Boolean        @default(true)
+
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  // Relations
+  services        Service[]
+  availability    Availability[]
   appointments    Appointment[]
 
   @@index([userId])
+  @@index([active])
 }
 
-model Availability {
-  id        String  @id @default(cuid())
-  userId    String
-  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  dayOfWeek Int     // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
-  startTime String  // "09:00"
-  endTime   String  // "18:00"
-  active    Boolean @default(true)
+// Services offered
+model Service {
+  id              String        @id @default(cuid())
+  professionalId  String
+  professional    Professional  @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+
+  name            String
+  description     String?
+  durationMinutes Int
+  price           Float
+  active          Boolean       @default(true)
+
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  // Relations
+  appointments    Appointment[]
+  rooms           ServiceRoom[]  // Many-to-many with rooms
+
+  @@index([professionalId])
+  @@index([active])
+}
+
+// Rooms/Spaces for appointments
+model Room {
+  id          String        @id @default(cuid())
+  userId      String
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name        String        // e.g., "Room 1", "Massage Room", "Studio A"
+  description String?
+  capacity    Int           @default(1)
+  active      Boolean       @default(true)
+
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  // Relations
+  services    ServiceRoom[]  // Many-to-many with services
+  appointments Appointment[]
 
   @@index([userId])
+  @@index([active])
 }
 
-model Appointment {
-  id            String   @id @default(cuid())
-  serviceId     String
-  service       Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
-  userId        String
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  customerName  String
-  customerEmail String
-  customerPhone String?
-  date          DateTime
-  time          String   // "14:30"
-  status        String   // "pending", "confirmed", "cancelled"
-  createdAt     DateTime @default(now())
+// Junction table for Service-Room relationship
+model ServiceRoom {
+  id        String   @id @default(cuid())
+  serviceId String
+  service   Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  roomId    String
+  room      Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
 
-  @@index([userId, date])
+  createdAt DateTime @default(now())
+
+  @@unique([serviceId, roomId])
   @@index([serviceId])
+  @@index([roomId])
+}
+
+// Professional availability schedule
+model Availability {
+  id             String       @id @default(cuid())
+  professionalId String
+  professional   Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+
+  dayOfWeek      Int          // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+  startTime      String       // "09:00"
+  endTime        String       // "18:00"
+  active         Boolean      @default(true)
+
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([professionalId])
+  @@index([dayOfWeek])
+}
+
+// Appointments/Bookings
+model Appointment {
+  id               String       @id @default(cuid())
+
+  serviceId        String
+  service          Service      @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  professionalId   String
+  professional     Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+
+  roomId           String?      // Optional - only if room is assigned
+  room             Room?        @relation(fields: [roomId], references: [id], onDelete: SetNull)
+
+  // Customer info
+  customerName     String
+  customerEmail    String
+  customerPhone    String?
+
+  // Appointment details
+  date             DateTime
+  time             String       // "14:30"
+  status           String       // "pending", "confirmed", "cancelled"
+
+  // Payment info
+  paymentStatus    String       @default("unpaid") // unpaid, paid, refunded
+  paymentAmount    Float?
+  paymentId        String?      // Stripe payment intent ID
+
+  // Self-service management
+  managementToken  String       @unique @default(cuid()) // Unique token for client to manage their booking
+
+  // Notes
+  notes            String?
+  cancellationReason String?
+
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  @@index([professionalId, date])
+  @@index([serviceId])
+  @@index([roomId])
+  @@index([managementToken])
+  @@index([customerEmail])
+}
+
+// Payment tracking
+model Payment {
+  id                String   @id @default(cuid())
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  stripePaymentId   String   @unique // Stripe payment intent or charge ID
+  amount            Float
+  currency          String   @default("usd")
+  status            String   // succeeded, pending, failed, refunded
+  type              String   // subscription, booking, one-time
+
+  description       String?
+  metadata          String?  // JSON string for additional data
+
+  createdAt         DateTime @default(now())
+
+  @@index([userId])
+  @@index([stripePaymentId])
+  @@index([type])
 }
