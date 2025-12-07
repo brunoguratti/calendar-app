@@ -15,6 +15,8 @@ import appointmentRoutes from './routes/appointmentRoutes';
 import publicRoutes from './routes/publicRoutes';
 import professionalRoutes from './routes/professionalRoutes';
 import roomRoutes from './routes/roomRoutes';
+import financialRoutes from './routes/financialRoutes';
+import bookingManagementRoutes from './routes/bookingManagementRoutes';
 
 // Import middleware
 import { errorHandler } from './middleware/errorHandler';
@@ -56,6 +58,8 @@ app.use('/api/rooms', roomRoutes);
 app.use('/api/services', serviceRoutes);
 app.use('/api/availability', availabilityRoutes);
 app.use('/api/appointments', appointmentRoutes);
+app.use('/api/financial', financialRoutes);
+app.use('/api/manage', bookingManagementRoutes); // Client booking management (no auth)
 app.use('/api/public', publicRoutes);
 
 // Error handling middleware (must be last)
