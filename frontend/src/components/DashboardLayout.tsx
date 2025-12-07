@@ -20,9 +20,12 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
 
   const navItems = [
     { path: '/dashboard', label: 'Dashboard', icon: '📊' },
-    { path: '/dashboard/appointments', label: 'Appointments', icon: '📅' },
+    { path: '/dashboard/professionals', label: 'Professionals', icon: '👥' },
+    { path: '/dashboard/rooms', label: 'Rooms', icon: '🏠' },
     { path: '/dashboard/services', label: 'Services', icon: '✂️' },
     { path: '/dashboard/availability', label: 'Availability', icon: '🕐' },
+    { path: '/dashboard/appointments', label: 'Appointments', icon: '📅' },
+    { path: '/dashboard/financial', label: 'Financial', icon: '💰' },
   ];
 
   return (

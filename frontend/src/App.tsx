@@ -8,6 +8,8 @@ import { RegisterPage } from './pages/auth/RegisterPage';
 
 // Dashboard Pages
 import { DashboardHomePage } from './pages/dashboard/DashboardHomePage';
+import Professionals from './pages/Professionals';
+import Rooms from './pages/Rooms';
 import { ServicesPage } from './pages/dashboard/ServicesPage';
 import { AvailabilityPage } from './pages/dashboard/AvailabilityPage';
 import { AppointmentsPage } from './pages/dashboard/AppointmentsPage';
@@ -43,6 +45,22 @@ function App() {
           element={
             <ProtectedRoute>
               <DashboardHomePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard/professionals"
+          element={
+            <ProtectedRoute>
+              <Professionals />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard/rooms"
+          element={
+            <ProtectedRoute>
+              <Rooms />
             </ProtectedRoute>
           }
         />
