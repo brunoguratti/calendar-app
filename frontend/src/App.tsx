@@ -13,6 +13,7 @@ import Rooms from './pages/Rooms';
 import { ServicesPage } from './pages/dashboard/ServicesPage';
 import { AvailabilityPage } from './pages/dashboard/AvailabilityPage';
 import { AppointmentsPage } from './pages/dashboard/AppointmentsPage';
+import Financial from './pages/Financial';
 
 // Public Pages
 import { HomePage } from './pages/HomePage';
@@ -85,6 +86,14 @@ function App() {
           element={
             <ProtectedRoute>
               <AppointmentsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard/financial"
+          element={
+            <ProtectedRoute>
+              <Financial />
             </ProtectedRoute>
           }
         />
