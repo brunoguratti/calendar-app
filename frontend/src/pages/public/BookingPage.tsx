@@ -6,8 +6,12 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Loading } from '../../components/ui/Loading';
 import { formatCurrency, formatTime, generateDateOptions } from '../../utils/helpers';
-import { ChevronRight, ChevronLeft, Calendar, User, Clock, CheckCircle } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Calendar, User, Clock, CheckCircle, CreditCard } from 'lucide-react';
 import axios from 'axios';
+import { loadStripe } from '@stripe/stripe-js';
+import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
+
+const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 
 interface ServiceGroup {
   id: string;
@@ -60,6 +64,11 @@ export const BookingPage: React.FC = () => {
   const [customerEmail, setCustomerEmail] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [notes, setNotes] = useState('');
+
+  // Payment
+  const [clientSecret, setClientSecret] = useState<string>('');
+  const [appointmentId, setAppointmentId] = useState<string>('');
+  const [paymentIntentId, setPaymentIntentId] = useState<string>('');
 
   useEffect(() => {
     const fetchData = async () => {
@@ -139,7 +148,7 @@ export const BookingPage: React.FC = () => {
     setSelectedTime('');
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleCustomerInfoSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!slug || !selectedProfessional || !selectedDate || !selectedTime) {
@@ -165,7 +174,13 @@ export const BookingPage: React.FC = () => {
         }
       );
 
-      navigate(`/booking-confirmed/${response.data.id}`);
+      // Store appointment details and payment intent
+      setAppointmentId(response.data.id);
+      setClientSecret(response.data.clientSecret);
+      setPaymentIntentId(response.data.stripePaymentIntentId);
+
+      // Move to payment step
+      setCurrentStep(4);
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to create booking. Please try again.');
     } finally {
@@ -198,20 +213,21 @@ export const BookingPage: React.FC = () => {
           <h1 className="text-4xl font-bold bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-transparent mb-2">
             {profile?.businessName}
           </h1>
-          <p className="text-lg text-gray-600">Book your appointment in 3 easy steps</p>
+          <p className="text-lg text-gray-600">Book your appointment in 4 easy steps</p>
         </div>
 
         {/* Progress Steps */}
         <div className="mb-8">
-          <div className="flex items-center justify-center gap-4">
+          <div className="flex items-center justify-center gap-2 lg:gap-4 flex-wrap">
             {[
               { num: 1, label: 'Service', icon: <Calendar size={20} /> },
               { num: 2, label: 'Professional', icon: <User size={20} /> },
               { num: 3, label: 'Date & Time', icon: <Clock size={20} /> },
+              { num: 4, label: 'Payment', icon: <CreditCard size={20} /> },
             ].map((step, idx) => (
               <React.Fragment key={step.num}>
                 <div
-                  className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
+                  className={`flex items-center gap-2 lg:gap-3 px-3 lg:px-4 py-2 lg:py-3 rounded-lg transition-all ${
                     currentStep === step.num
                       ? 'bg-gradient-to-r from-primary to-secondary text-white shadow-lg'
                       : currentStep > step.num
@@ -224,12 +240,12 @@ export const BookingPage: React.FC = () => {
                   ) : (
                     step.icon
                   )}
-                  <span className="font-semibold">{step.label}</span>
+                  <span className="font-semibold text-sm lg:text-base">{step.label}</span>
                 </div>
-                {idx < 2 && (
+                {idx < 3 && (
                   <ChevronRight
                     size={24}
-                    className={currentStep > step.num ? 'text-success' : 'text-gray-300'}
+                    className={`hidden sm:block ${currentStep > step.num ? 'text-success' : 'text-gray-300'}`}
                   />
                 )}
               </React.Fragment>
@@ -423,7 +439,7 @@ export const BookingPage: React.FC = () => {
             {selectedTime && (
               <Card>
                 <h2 className="text-2xl font-bold text-gray-900 mb-6">Your Information</h2>
-                <form onSubmit={handleSubmit} className="space-y-4">
+                <form onSubmit={handleCustomerInfoSubmit} className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <Input
                       value={customerName}
@@ -503,10 +519,10 @@ export const BookingPage: React.FC = () => {
                     {isSubmitting ? (
                       <span className="flex items-center justify-center gap-2">
                         <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                        Booking...
+                        Processing...
                       </span>
                     ) : (
-                      'Confirm Booking'
+                      'Continue to Payment'
                     )}
                   </Button>
                 </form>
@@ -514,7 +530,144 @@ export const BookingPage: React.FC = () => {
             )}
           </div>
         )}
+
+        {/* Step 4: Payment */}
+        {currentStep === 4 && clientSecret && (
+          <Card>
+            <h2 className="text-2xl font-bold text-gray-900 mb-6">Complete Payment</h2>
+
+            <div className="bg-gradient-to-r from-primary-50 to-secondary-50 rounded-lg p-6 mb-6">
+              <h3 className="font-bold text-gray-900 mb-3">Booking Summary</h3>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Service:</span>
+                  <span className="font-medium">{selectedService?.name}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Professional:</span>
+                  <span className="font-medium">{selectedProfessional?.name}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Date:</span>
+                  <span className="font-medium">
+                    {format(new Date(selectedDate + 'T00:00:00'), 'MMMM d, yyyy')}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Time:</span>
+                  <span className="font-medium">{formatTime(selectedTime)}</span>
+                </div>
+                <div className="flex justify-between pt-3 border-t border-primary-200">
+                  <span className="font-bold text-gray-900">Total:</span>
+                  <span className="text-2xl font-bold text-primary-600">
+                    {formatCurrency(selectedService?.price || 0)}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <Elements stripe={stripePromise} options={{ clientSecret }}>
+              <PaymentForm
+                appointmentId={appointmentId}
+                paymentIntentId={paymentIntentId}
+                onSuccess={() => navigate(`/booking-confirmed/${appointmentId}`)}
+                onError={(error) => setError(error)}
+              />
+            </Elements>
+          </Card>
+        )}
       </div>
     </div>
+  );
+};
+
+// Payment Form Component
+interface PaymentFormProps {
+  appointmentId: string;
+  paymentIntentId: string;
+  onSuccess: () => void;
+  onError: (error: string) => void;
+}
+
+const PaymentForm: React.FC<PaymentFormProps> = ({ appointmentId, paymentIntentId, onSuccess, onError }) => {
+  const stripe = useStripe();
+  const elements = useElements();
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!stripe || !elements) {
+      return;
+    }
+
+    setIsProcessing(true);
+    onError('');
+
+    try {
+      // Confirm the payment
+      const { error: submitError } = await elements.submit();
+      if (submitError) {
+        onError(submitError.message || 'Payment submission failed');
+        setIsProcessing(false);
+        return;
+      }
+
+      const { error } = await stripe.confirmPayment({
+        elements,
+        confirmParams: {
+          return_url: window.location.origin + '/booking-confirmed/' + appointmentId,
+        },
+        redirect: 'if_required',
+      });
+
+      if (error) {
+        onError(error.message || 'Payment failed. Please try again.');
+        setIsProcessing(false);
+      } else {
+        // Payment succeeded - confirm with backend
+        try {
+          await axios.post(`${import.meta.env.VITE_API_URL}/public/confirm-payment`, {
+            appointmentId,
+            paymentIntentId,
+          });
+          onSuccess();
+        } catch (err: any) {
+          onError(err.response?.data?.error || 'Failed to confirm payment');
+          setIsProcessing(false);
+        }
+      }
+    } catch (err: any) {
+      onError('An unexpected error occurred. Please try again.');
+      setIsProcessing(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="bg-white rounded-lg">
+        <PaymentElement />
+      </div>
+
+      <Button
+        type="submit"
+        variant="primary"
+        className="w-full py-4 text-lg"
+        disabled={!stripe || isProcessing}
+      >
+        {isProcessing ? (
+          <span className="flex items-center justify-center gap-2">
+            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+            Processing Payment...
+          </span>
+        ) : (
+          'Pay Now'
+        )}
+      </Button>
+
+      <p className="text-sm text-gray-500 text-center">
+        Your payment is secured by Stripe. We never store your card information.
+      </p>
+    </form>
   );
 };
