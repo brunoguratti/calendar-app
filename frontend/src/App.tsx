@@ -19,6 +19,7 @@ import Financial from './pages/Financial';
 import { HomePage } from './pages/HomePage';
 import { BookingPage } from './pages/public/BookingPage';
 import { BookingConfirmationPage } from './pages/public/BookingConfirmationPage';
+import { BookingManagement } from './pages/public/BookingManagement';
 
 // Components
 import { ProtectedRoute } from './components/ProtectedRoute';
@@ -39,6 +40,7 @@ function App() {
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/book/:slug" element={<BookingPage />} />
         <Route path="/booking-confirmed/:id" element={<BookingConfirmationPage />} />
+        <Route path="/manage/:token" element={<BookingManagement />} />
 
         {/* Protected Dashboard Routes */}
         <Route
