@@ -12,6 +12,7 @@ import {
   sendAppointmentConfirmationEmail,
   sendAppointmentNotificationToProfessional
 } from '../utils/email';
+import { createPaymentIntent, retrievePaymentIntent } from '../utils/stripe';
 
 export const getPublicProfile = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -430,7 +431,7 @@ export const createPublicAppointment = async (req: Request, res: Response): Prom
         customerPhone,
         date: dateObj,
         time,
-        status,
+        status: 'pending', // Will be confirmed after payment
         notes,
         paymentStatus: 'unpaid', // Will be updated after payment
         paymentAmount: service.price,
@@ -465,22 +466,149 @@ export const createPublicAppointment = async (req: Request, res: Response): Prom
       }
     });
 
-    // Send confirmation emails
-    try {
-      // Send confirmation email to customer
-      await sendAppointmentConfirmationEmail({ appointment });
+    // Create Stripe payment intent
+    const paymentIntent = await createPaymentIntent(
+      service.price,
+      'usd',
+      {
+        appointmentId: appointment.id,
+        customerEmail: appointment.customerEmail,
+        customerName: appointment.customerName,
+        serviceName: service.name,
+      }
+    );
 
-      // Send notification email to professional
-      await sendAppointmentNotificationToProfessional({ appointment });
-    } catch (emailError) {
-      // Log email error but don't fail the appointment creation
-      console.error('Email sending failed:', emailError);
-    }
+    // Update appointment with payment intent ID
+    await prisma.appointment.update({
+      where: { id: appointment.id },
+      data: { stripePaymentIntentId: paymentIntent.id }
+    });
+
+    // Note: We'll send confirmation emails after payment is confirmed
+    // For now, just return the appointment with payment client secret
 
     res.status(201).json({
       ...appointment,
+      clientSecret: paymentIntent.client_secret,
       managementUrl: `/manage/${appointment.managementToken}`
     });
+  } catch (error) {
+    throw error;
+  }
+};
+
+/**
+ * Confirm payment and finalize appointment
+ */
+export const confirmAppointmentPayment = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { appointmentId, paymentIntentId } = req.body;
+
+    if (!appointmentId || !paymentIntentId) {
+      res.status(400).json({ error: 'Missing required fields' });
+      return;
+    }
+
+    // Find the appointment
+    const appointment = await prisma.appointment.findUnique({
+      where: { id: appointmentId },
+      include: {
+        service: {
+          select: {
+            name: true,
+            price: true,
+            durationMinutes: true,
+          }
+        },
+        professional: {
+          select: {
+            name: true,
+            email: true,
+          },
+          include: {
+            user: {
+              select: {
+                businessName: true,
+                email: true,
+                autoApproveBookings: true,
+              }
+            }
+          }
+        },
+        room: {
+          select: {
+            name: true,
+          }
+        }
+      }
+    });
+
+    if (!appointment) {
+      res.status(404).json({ error: 'Appointment not found' });
+      return;
+    }
+
+    if (appointment.paymentStatus === 'paid') {
+      res.status(400).json({ error: 'Payment already confirmed' });
+      return;
+    }
+
+    // Verify payment with Stripe
+    const paymentIntent = await retrievePaymentIntent(paymentIntentId);
+
+    if (paymentIntent.status !== 'succeeded') {
+      res.status(400).json({ error: 'Payment has not been completed' });
+      return;
+    }
+
+    // Update appointment with payment confirmation
+    const status = appointment.professional.user.autoApproveBookings ? 'confirmed' : 'pending';
+    const updatedAppointment = await prisma.appointment.update({
+      where: { id: appointmentId },
+      data: {
+        paymentStatus: 'paid',
+        status,
+        stripePaymentIntentId: paymentIntentId,
+      },
+      include: {
+        service: {
+          select: {
+            name: true,
+            price: true,
+            durationMinutes: true,
+          }
+        },
+        professional: {
+          select: {
+            name: true,
+            email: true,
+          },
+          include: {
+            user: {
+              select: {
+                businessName: true,
+                email: true,
+              }
+            }
+          }
+        },
+        room: {
+          select: {
+            name: true,
+          }
+        }
+      }
+    });
+
+    // Send confirmation emails
+    try {
+      await sendAppointmentConfirmationEmail({ appointment: updatedAppointment });
+      await sendAppointmentNotificationToProfessional({ appointment: updatedAppointment });
+    } catch (emailError) {
+      console.error('Email sending failed:', emailError);
+    }
+
+    res.status(200).json(updatedAppointment);
   } catch (error) {
     throw error;
   }
