@@ -19,7 +19,7 @@ import Financial from './pages/Financial';
 import { HomePage } from './pages/HomePage';
 import { BookingPage } from './pages/public/BookingPage';
 import { BookingConfirmationPage } from './pages/public/BookingConfirmationPage';
-import { BookingManagement } from './pages/public/BookingManagement';
+import BookingManagement from './pages/public/BookingManagement';
 
 // Components
 import { ProtectedRoute } from './components/ProtectedRoute';
