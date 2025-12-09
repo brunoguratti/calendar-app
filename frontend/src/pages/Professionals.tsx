@@ -35,9 +35,11 @@ export default function Professionals() {
       const response = await axios.get(`${import.meta.env.VITE_API_URL}/professionals`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setProfessionals(response.data);
+      // Ensure we always set an array
+      setProfessionals(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       console.error('Error fetching professionals:', error);
+      setProfessionals([]); // Set empty array on error
     } finally {
       setLoading(false);
     }

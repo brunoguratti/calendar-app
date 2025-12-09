@@ -37,9 +37,11 @@ export default function Rooms() {
       const response = await axios.get(`${import.meta.env.VITE_API_URL}/rooms`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setRooms(response.data);
+      // Ensure we always set an array
+      setRooms(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       console.error('Error fetching rooms:', error);
+      setRooms([]); // Set empty array on error
     } finally {
       setLoading(false);
     }
