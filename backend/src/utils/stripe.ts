@@ -1,19 +1,35 @@
 import Stripe from 'stripe';
 
-if (!process.env.STRIPE_SECRET_KEY) {
-  throw new Error('STRIPE_SECRET_KEY is not defined in environment variables');
+// Stripe is optional - if not configured, bookings will work without payment
+const stripe = process.env.STRIPE_SECRET_KEY
+  ? new Stripe(process.env.STRIPE_SECRET_KEY, {
+      apiVersion: '2024-11-20.acacia',
+    })
+  : null;
+
+// Log Stripe status at startup
+if (stripe) {
+  console.log('✓ Stripe payment integration enabled');
+} else {
+  console.log('⚠ Stripe not configured - bookings will work without payment');
 }
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-  apiVersion: '2024-11-20.acacia',
-});
-
 export default stripe;
+
+/**
+ * Check if Stripe is enabled
+ */
+export const isStripeEnabled = (): boolean => {
+  return stripe !== null;
+};
 
 /**
  * Create a Stripe customer
  */
 export const createCustomer = async (email: string, name: string) => {
+  if (!stripe) {
+    throw new Error('Stripe is not configured');
+  }
   return await stripe.customers.create({
     email,
     name,
@@ -27,6 +43,9 @@ export const createSubscription = async (
   customerId: string,
   priceId: string
 ) => {
+  if (!stripe) {
+    throw new Error('Stripe is not configured');
+  }
   return await stripe.subscriptions.create({
     customer: customerId,
     items: [{ price: priceId }],
@@ -44,6 +63,9 @@ export const createPaymentIntent = async (
   currency: string = 'usd',
   metadata?: Record<string, string>
 ) => {
+  if (!stripe) {
+    throw new Error('Stripe is not configured');
+  }
   return await stripe.paymentIntents.create({
     amount: Math.round(amount * 100), // Convert to cents
     currency,
@@ -58,6 +80,9 @@ export const createPaymentIntent = async (
  * Retrieve a payment intent
  */
 export const retrievePaymentIntent = async (paymentIntentId: string) => {
+  if (!stripe) {
+    throw new Error('Stripe is not configured');
+  }
   return await stripe.paymentIntents.retrieve(paymentIntentId);
 };
 
@@ -65,6 +90,9 @@ export const retrievePaymentIntent = async (paymentIntentId: string) => {
  * Cancel a subscription
  */
 export const cancelSubscription = async (subscriptionId: string) => {
+  if (!stripe) {
+    throw new Error('Stripe is not configured');
+  }
   return await stripe.subscriptions.cancel(subscriptionId);
 };
 
@@ -72,5 +100,8 @@ export const cancelSubscription = async (subscriptionId: string) => {
  * Retrieve a subscription
  */
 export const retrieveSubscription = async (subscriptionId: string) => {
+  if (!stripe) {
+    throw new Error('Stripe is not configured');
+  }
   return await stripe.subscriptions.retrieve(subscriptionId);
 };

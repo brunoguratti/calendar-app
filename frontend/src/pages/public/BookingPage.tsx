@@ -174,13 +174,19 @@ export const BookingPage: React.FC = () => {
         }
       );
 
-      // Store appointment details and payment intent
-      setAppointmentId(response.data.id);
-      setClientSecret(response.data.clientSecret);
-      setPaymentIntentId(response.data.stripePaymentIntentId);
+      // Check if payment is required
+      if (response.data.paymentRequired) {
+        // Store appointment details and payment intent
+        setAppointmentId(response.data.id);
+        setClientSecret(response.data.clientSecret);
+        setPaymentIntentId(response.data.stripePaymentIntentId);
 
-      // Move to payment step
-      setCurrentStep(4);
+        // Move to payment step
+        setCurrentStep(4);
+      } else {
+        // No payment required - go directly to confirmation
+        navigate(`/booking-confirmed/${response.data.id}`);
+      }
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to create booking. Please try again.');
     } finally {
@@ -213,7 +219,7 @@ export const BookingPage: React.FC = () => {
           <h1 className="text-4xl font-bold bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-transparent mb-2">
             {profile?.businessName}
           </h1>
-          <p className="text-lg text-gray-600">Book your appointment in 4 easy steps</p>
+          <p className="text-lg text-gray-600">Book your appointment in easy steps</p>
         </div>
 
         {/* Progress Steps */}

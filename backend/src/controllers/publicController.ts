@@ -12,7 +12,7 @@ import {
   sendAppointmentConfirmationEmail,
   sendAppointmentNotificationToProfessional
 } from '../utils/email';
-import { createPaymentIntent, retrievePaymentIntent } from '../utils/stripe';
+import { createPaymentIntent, retrievePaymentIntent, isStripeEnabled } from '../utils/stripe';
 
 export const getPublicProfile = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -420,6 +420,9 @@ export const createPublicAppointment = async (req: Request, res: Response): Prom
     // Determine status based on auto-approve setting
     const status = service.professional.user.autoApproveBookings ? 'confirmed' : 'pending';
 
+    // Check if Stripe is enabled
+    const stripeEnabled = isStripeEnabled();
+
     // Create appointment
     const appointment = await prisma.appointment.create({
       data: {
@@ -431,9 +434,9 @@ export const createPublicAppointment = async (req: Request, res: Response): Prom
         customerPhone,
         date: dateObj,
         time,
-        status: 'pending', // Will be confirmed after payment
+        status: stripeEnabled ? 'pending' : status, // If no payment, use auto-approve setting
         notes,
-        paymentStatus: 'unpaid', // Will be updated after payment
+        paymentStatus: stripeEnabled ? 'unpaid' : 'paid', // If no payment system, mark as paid
         paymentAmount: service.price,
       },
       include: {
@@ -466,32 +469,48 @@ export const createPublicAppointment = async (req: Request, res: Response): Prom
       }
     });
 
-    // Create Stripe payment intent
-    const paymentIntent = await createPaymentIntent(
-      service.price,
-      'usd',
-      {
-        appointmentId: appointment.id,
-        customerEmail: appointment.customerEmail,
-        customerName: appointment.customerName,
-        serviceName: service.name,
+    // If Stripe is enabled, create payment intent
+    if (stripeEnabled) {
+      const paymentIntent = await createPaymentIntent(
+        service.price,
+        'usd',
+        {
+          appointmentId: appointment.id,
+          customerEmail: appointment.customerEmail,
+          customerName: appointment.customerName,
+          serviceName: service.name,
+        }
+      );
+
+      // Update appointment with payment intent ID
+      await prisma.appointment.update({
+        where: { id: appointment.id },
+        data: { stripePaymentIntentId: paymentIntent.id }
+      });
+
+      // Return appointment with payment client secret
+      res.status(201).json({
+        ...appointment,
+        clientSecret: paymentIntent.client_secret,
+        paymentRequired: true,
+        managementUrl: `/manage/${appointment.managementToken}`
+      });
+    } else {
+      // No payment required - send confirmation emails immediately
+      try {
+        await sendAppointmentConfirmationEmail({ appointment });
+        await sendAppointmentNotificationToProfessional({ appointment });
+      } catch (emailError) {
+        console.error('Email sending failed:', emailError);
       }
-    );
 
-    // Update appointment with payment intent ID
-    await prisma.appointment.update({
-      where: { id: appointment.id },
-      data: { stripePaymentIntentId: paymentIntent.id }
-    });
-
-    // Note: We'll send confirmation emails after payment is confirmed
-    // For now, just return the appointment with payment client secret
-
-    res.status(201).json({
-      ...appointment,
-      clientSecret: paymentIntent.client_secret,
-      managementUrl: `/manage/${appointment.managementToken}`
-    });
+      // Return appointment without payment
+      res.status(201).json({
+        ...appointment,
+        paymentRequired: false,
+        managementUrl: `/manage/${appointment.managementToken}`
+      });
+    }
   } catch (error) {
     throw error;
   }
